@@ -3,28 +3,33 @@ import json
 import requests
 import asyncio
 from telegram import Bot
+from datetime import datetime
 
-# ===== VARIABLES A REMPLACER VIA RENDER ENV =====
+# ===== VARIABLES VIA RENDER ENV =====
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 HELIUS_API_KEY = os.getenv("HELIUS_API_KEY")
 
-CHECK_INTERVAL = 25  # temps entre chaque vérification des wallets en secondes
+CHECK_INTERVAL = 25  # secondes
 
 bot = Bot(token=BOT_TOKEN)
 seen = set()
 
-# ===== CHARGER LES WALLETS DEPUIS wallets.json =====
+# ===== CHARGER LES WALLETS =====
 with open("wallets.json", "r") as f:
     WALLETS = json.load(f)
 
-# ===== FONCTION POUR RECUPERER LES TRANSACTIONS =====
+# ===== RECUPERER LES TRANSACTIONS =====
 def fetch_txs(wallet):
     url = f"https://api.helius.xyz/v0/addresses/{wallet}/transactions?api-key={HELIUS_API_KEY}"
-    r = requests.get(url)
-    return r.json() if r.status_code == 200 else []
+    try:
+        r = requests.get(url, timeout=10)
+        return r.json() if r.status_code == 200 else []
+    except Exception as e:
+        print(f"Error fetching transactions for {wallet}: {e}")
+        return []
 
-# ===== FONCTION POUR CLASSIFIER LE TYPE DE TRANSACTION =====
+# ===== CLASSIFIER LES TRANSACTIONS =====
 def classify(tx):
     t = tx.get("type")
     if t == "SWAP":
@@ -33,33 +38,154 @@ def classify(tx):
         return "🔁 Transfert"
     if t in ["MINT", "CREATE_TOKEN"]:
         return "🆕 Création de token"
-    return None
+    if t == "NFT_SALE":
+        return "💰 Vente NFT"
+    if t == "NFT_MINT":
+        return "🎨 Mint NFT"
+    return "⚡ Autre"
 
-# ===== FONCTION POUR ENVOYER LE MESSAGE SUR TELEGRAM =====
-async def notify(name, wallet, action, sig):
-    msg = (
-        f"👤 *{name}*\n"
-        f"`{wallet}`\n\n"
-        f"📌 {action}\n"
-        f"🔗 https://solscan.io/tx/{sig}"
-    )
-    await bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode="Markdown")
+# ===== FORMATER LES DETAILLES DE TRANSACTION =====
+def format_transaction_details(tx, wallet_address, wallet_name):
+    tx_signature = tx.get("signature", "N/A")[:8] + "..."
+    timestamp = tx.get("timestamp", int(datetime.now().timestamp()))
+    
+    # Convertir le timestamp en date lisible
+    try:
+        tx_time = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+    except:
+        tx_time = "N/A"
+    
+    tx_type = classify(tx)
+    
+    # Essayer d'extraire le montant si disponible
+    amount = "N/A"
+    if "nativeTransfers" in tx and tx["nativeTransfers"]:
+        amount = tx["nativeTransfers"][0].get("amount", 0) / 1e9  # Convertir de lamports à SOL
+        amount = f"{amount:.4f} SOL"
+    
+    # Essayer d'extraire le token si disponible
+    token_info = ""
+    if "tokenTransfers" in tx and tx["tokenTransfers"]:
+        token_transfer = tx["tokenTransfers"][0]
+        token_amount = token_transfer.get("tokenAmount", 0)
+        token_symbol = token_transfer.get("symbol", "Unknown")
+        token_info = f"\n💰 Token: {token_amount} {token_symbol}"
+    
+    message = f"""
+🏦 **Wallet:** {wallet_name}
+📝 **Signature:** `{tx_signature}`
+⏰ **Heure:** {tx_time}
+📊 **Type:** {tx_type}
+💸 **Montant:** {amount}{token_info}
+🔗 **Explorer:** https://solscan.io/tx/{tx.get('signature', '')}
+📎 **Adresse:** `{wallet_address[:8]}...{wallet_address[-6:]}`
+"""
+    return message
+
+# ===== ENVOYER MESSAGE TELEGRAM =====
+async def send_telegram_message(message):
+    try:
+        await bot.send_message(
+            chat_id=CHAT_ID,
+            text=message,
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+        print(f"Message sent to Telegram")
+    except Exception as e:
+        print(f"Error sending message: {e}")
+
+# ===== TRAITER LES NOUVELLES TRANSACTIONS =====
+async def process_wallet(wallet_address, wallet_name):
+    print(f"Checking wallet: {wallet_name} ({wallet_address[:8]}...)")
+    
+    transactions = fetch_txs(wallet_address)
+    if not transactions:
+        return
+    
+    # Trier par timestamp (le plus récent d'abord)
+    transactions.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+    
+    for tx in transactions[:5]:  # Vérifier les 5 transactions les plus récentes
+        tx_id = tx.get("signature")
+        
+        if not tx_id:
+            continue
+        
+        # Vérifier si la transaction a déjà été vue
+        if tx_id not in seen:
+            seen.add(tx_id)
+            
+            # Attendre 2 secondes pour éviter le spam
+            await asyncio.sleep(2)
+            
+            # Envoyer la notification
+            message = format_transaction_details(tx, wallet_address, wallet_name)
+            await send_telegram_message(message)
+            
+            # Log
+            print(f"New transaction found for {wallet_name}: {tx_id[:10]}...")
 
 # ===== BOUCLE PRINCIPALE =====
 async def main():
+    print("🤖 Bot started! Monitoring wallets...")
+    
+    # Initialisation : récupérer les transactions existantes
+    print("Initializing: fetching existing transactions...")
+    for wallet_address, wallet_name in WALLETS.items():
+        transactions = fetch_txs(wallet_address)
+        if transactions:
+            for tx in transactions[:10]:  # Marquer les 10 dernières comme vues
+                tx_id = tx.get("signature")
+                if tx_id:
+                    seen.add(tx_id)
+    
+    print(f"Loaded {len(seen)} existing transactions into memory")
+    
+    # Boucle de surveillance principale
     while True:
-        for name, wallet in WALLETS.items():
-            txs = fetch_txs(wallet)
-            for tx in txs:
-                sig = tx["signature"]
-                if sig in seen:
-                    continue
-                seen.add(sig)
-                action = classify(tx)
-                if action:
-                    await notify(name, wallet, action, sig)
-        await asyncio.sleep(CHECK_INTERVAL)
+        try:
+            print(f"\n🔍 Checking all wallets at {datetime.now().strftime('%H:%M:%S')}")
+            
+            for wallet_address, wallet_name in WALLETS.items():
+                await process_wallet(wallet_address, wallet_name)
+                await asyncio.sleep(1)  # Petite pause entre les wallets
+            
+            print(f"Sleeping for {CHECK_INTERVAL} seconds...")
+            await asyncio.sleep(CHECK_INTERVAL)
+            
+        except Exception as e:
+            print(f"Error in main loop: {e}")
+            await asyncio.sleep(30)  # Attendre en cas d'erreur
 
-# ===== LANCEMENT DU BOT =====
+# ===== LANCER LE BOT =====
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Vérifier les variables d'environnement
+    required_vars = ["BOT_TOKEN", "CHAT_ID", "HELIUS_API_KEY"]
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        print(f"❌ Missing environment variables: {', '.join(missing_vars)}")
+        print("Please set them in Render environment variables")
+        exit(1)
+    
+    # Vérifier si wallets.json existe
+    if not os.path.exists("wallets.json"):
+        print("❌ wallets.json not found!")
+        print("Creating a sample wallets.json file...")
+        
+        sample_wallets = {
+            "WALLET_ADDRESS_1": "Main Wallet",
+            "WALLET_ADDRESS_2": "Trading Wallet"
+        }
+        
+        with open("wallets.json", "w") as f:
+            json.dump(sample_wallets, f, indent=2)
+        
+        print("✅ Sample wallets.json created. Please edit with real wallet addresses.")
+    
+    # Démarrer le bot
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n👋 Bot stopped by user")
