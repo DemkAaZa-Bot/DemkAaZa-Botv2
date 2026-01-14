@@ -1,13 +1,13 @@
 {
-  "Wallet test": "9xQeWvG816bUx9EPpV9wYJqM8N9ZJmRkXkG3E6ZP8hX",
-  "Wallet 1": "2pmDcWzjyE7kF4vZ1bCgac5SGyY5CkZ5L1F5DcX876RS",
-  "Wallet 2": "axmFmfqQwZGEUZeF3i3MqbRCDiGPfshtbdoBjk41k88",
-  "Wallet 3": "H2cDR3EkJjtTKDQKk8SJS48du9mhsdzQhy8xJx5UMqQK",
-  "Wallet 4": "AVmoTthdrX6tKt4nDjco2D775W2YK3sDhxPcMmzUAmTY",
-  "Wallet 5": "3LUfv2u5yzsDtUzPdsSJ7ygPBuqwfycMkjpNreRR2Yww",
-  "Wallet 6": "xaAaoxaS5323w8hPWjRqbuiwB66S1ySr1EnyNhrCTLy",
-  "Wallet 7": "EDCSJAPDf9Aq6GJXU2EiTciMJkhY9PAd2xkXn6BZw9u1",
-  "Wallet 8": "7wXMvvN6zi6dpfrX6sHNZzndDAhBqk2PmuYu93NeXzH",
-  "Wallet 9": "dcgWrBBsUHHSYwH3p3njxPyqqgzCM1hwWXRhBkjpEJn",
-  "Wallet 10": "DLoJzhD4n5McSgizt5aPPLFCdPahQzn3Y1LeZ6daCKpa"
+  "9xQeWvG816bUx9EPpV9wYJqM8N9ZJmRkXkG3E6ZP8hX": "Wallet test",
+  "2pmDcWzjyE7kF4vZ1bCgac5SGyY5CkZ5L1F5DcX876RS": "Wallet 1",
+  "axmFmfqQwZGEUZeF3i3MqbRCDiGPfshtbdoBjk41k88": "Wallet 2",
+  "H2cDR3EkJjtTKDQKk8SJS48du9mhsdzQhy8xJx5UMqQK": "Wallet 3",
+  "AVmoTthdrX6tKt4nDjco2D775W2YK3sDhxPcMmzUAmTY": "Wallet 4",
+  "3LUfv2u5yzsDtUzPdsSJ7ygPBuqwfycMkjpNreRR2Yww": "Wallet 5",
+  "xaAaoxaS5323w8hPWjRqbuiwB66S1ySr1EnyNhrCTLy": "Wallet 6",
+  "EDCSJAPDf9Aq6GJXU2EiTciMJkhY9PAd2xkXn6BZw9u1": "Wallet 7",
+  "7wXMvvN6zi6dpfrX6sHNZzndDAhBqk2PmuYu93NeXzH": "Wallet 8",
+  "dcgWrBBsUHHSYwH3p3njxPyqqgzCM1hwWXRhBkjpEJn": "Wallet 9",
+  "DLoJzhD4n5McSgizt5aPPLFCdPahQzn3Y1LeZ6daCKpa": "Wallet 10"
 }
